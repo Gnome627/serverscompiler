@@ -118,15 +118,15 @@ def process_nodes(xml, folder, tag, nodename):
     return xml_models
 
 def process_prototypes(gameobjects_filepath, prototypes_used = None):
-    # try:
+    try:
         models = []
         xml = etree.parse(gameobjects_filepath)
         root = xml.getroot()
         for model in ['ModelFile', 'BrokenModel', 'DestroyedModel', 'GateModelFile', 'SuspensionModelFile']:
             models += get_recursive_models_from_gameobjects(root, model, prototypes_used)
         return models
-    # except:
-    #     print(f'    🚫 Не найден файл {gameobjects_file}')
+    except:
+        print(f'    🚫 Не найден файл {gameobjects_file}')
 
 print(f'Вас приветствует 🦐   HTA servers.xml Compiler ver. {version} \n')
 map_folder = diropenbox(
