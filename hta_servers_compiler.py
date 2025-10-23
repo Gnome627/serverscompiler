@@ -31,7 +31,6 @@ used_gameobjects = [
     'breakableobjects.xml',
     'bosses.xml',
     'towns.xml',
-    'crotchtowns.xml'
 ]
 gameobjects = '../../gamedata/gameobjects/'
 dynscene = 'dynamicscene.xml'
@@ -125,7 +124,7 @@ def process_prototypes(gameobjects_filepath, prototypes_used = None):
         for model in ['ModelFile', 'BrokenModel', 'DestroyedModel', 'GateModelFile', 'SuspensionModelFile']:
             models += get_recursive_models_from_gameobjects(root, model, prototypes_used)
         return models
-    except:
+    except FileNotFoundError as e:
         print(f'    🚫 Не найден файл {gameobjects_file}')
 
 print(f'Вас приветствует 🦐   HTA servers.xml Compiler ver. {version} \n')
@@ -163,7 +162,7 @@ if base_gameobjects:
 print(f'    🧹 Удаление возможных дубликатов...')
 gameobjects_models = list(set(gameobjects_models))
 
-servers_models = world_models + strings_models + dynscene_models + gameobjects_models
+servers_models = world_models + strings_models + dynscene_models + gameobjects_models + default_animmodels
 
 print(f'    🛁 Окончательная очистка...')
 servers_models = list(set(servers_models))
