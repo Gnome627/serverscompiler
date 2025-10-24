@@ -23,8 +23,6 @@ base_gameobjects = [
     'smallguns.xml',
     'thunderbolt.xml',
     'vehicleparts.xml',
-    'vehiclescrotch.xml',
-    'crotchguns.xml',
     'wares.xml'
 ]
 used_gameobjects = [
@@ -36,6 +34,7 @@ gameobjects = '../../gamedata/gameobjects/'
 dynscene = 'dynamicscene.xml'
 world = 'world.xml'
 strings = 'strings.xml'
+effects = '../../effects/'
 default_animmodels = {
     'cargo',
     'box',
@@ -47,6 +46,8 @@ default_animmodels = {
 }
 sounds = '../../sounds/'
 servers_animmodels_file = 'data\models\AnimModels.xml'
+
+parser = etree.XMLParser(recover=True)
 
 try:
     with open('servcomp.yaml', 'r', encoding='utf-8') as f:
@@ -62,6 +63,7 @@ try:
         if 'sounds' in config: sounds = config['sounds']
         if 'declaration' in config: declaration = config['declaration']
         if 'servers_animmodels_file' in config: servers_animmodels_file = config['servers_animmodels_file']
+        if 'effects' in config: effects = config['effects']
 except FileNotFoundError as e:
     print('🚫 файл конфигурации не найден')
 
@@ -69,7 +71,7 @@ def get_recursive_models(root, tag, node_name):
     model_names = []
     for node in root.findall(node_name):
         model_name = node.get(tag)
-        if model_name and not model_name in model_names:
+        if model_name and not model_name in model_names and not model_name.startswith('PS_'):
             model_names.append(model_name)
             if debug: print(f'    • Получен {model_name}')
         else:
@@ -108,7 +110,7 @@ def get_recursive_models_from_gameobjects(root, tag, prototypes_used = None):
     return model_names
 
 def process_nodes(xml, folder, tag, nodename):
-    xml_tree = etree.parse(f'{folder}\\{xml}')
+    xml_tree = etree.parse(f'{folder}\\{xml}', parser)
     xml_root = xml_tree.getroot()
     print(f'  🔬 Обработка моделей в {xml}...')
     xml_models = get_recursive_models(xml_root, tag, nodename)
@@ -119,13 +121,30 @@ def process_nodes(xml, folder, tag, nodename):
 def process_prototypes(gameobjects_filepath, prototypes_used = None):
     try:
         models = []
-        xml = etree.parse(gameobjects_filepath)
+        xml = etree.parse(gameobjects_filepath, parser)
         root = xml.getroot()
         for model in ['ModelFile', 'BrokenModel', 'DestroyedModel', 'GateModelFile', 'SuspensionModelFile']:
             models += get_recursive_models_from_gameobjects(root, model, prototypes_used)
         return models
-    except FileNotFoundError as e:
+    except (FileNotFoundError, OSError) as e:
         print(f'    🚫 Не найден файл {gameobjects_file}')
+
+def find_psys_files(directory):
+    psys_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith('.psys'):
+                # Формируем полный путь к файлу
+                psys_files.append(os.path.join(root, file))
+    return psys_files
+
+def process_psys(psys_file):
+    xml_tree = etree.parse(psys_file, parser)
+    xml_root = xml_tree.getroot().find('PS')
+    xml_models = get_recursive_models(xml_root, 'Name', 'Model')
+    xml_models = list(set(xml_models))
+    return xml_models
+
 
 print(f'Вас приветствует 🦐   HTA servers.xml Compiler ver. {version} \n')
 map_folder = diropenbox(
@@ -158,14 +177,25 @@ if base_gameobjects:
     print(f'  😎 Сохранение списка базовых прототипов...')
     for gameobjects_file in base_gameobjects:
         print(f'    🔧 Обрабатывается {gameobjects_file}:')
-        gameobjects_models += process_prototypes(f'{gameobjects_path}\\{gameobjects_file}')
+        try:
+            gameobjects_models += process_prototypes(f'{gameobjects_path}\\{gameobjects_file}')
+        except TypeError as e:
+            print(f'      🚫 Файл не найден')
+
 print(f'    🧹 Удаление возможных дубликатов...')
 gameobjects_models = list(set(gameobjects_models))
 
-servers_models = world_models + strings_models + dynscene_models + gameobjects_models + default_animmodels
+effects_folder = (f'{map_folder}\\{effects}')
+print(f'  💥 Обработка моделей эффектов...')
+psys_files = find_psys_files(effects_folder)
+effects_models = []
+for psys in psys_files:
+    effects_models.extend(process_psys(psys))
+servers_models = world_models + strings_models + dynscene_models + gameobjects_models + effects_models + default_animmodels
 
 print(f'    🛁 Окончательная очистка...')
 servers_models = list(set(servers_models))
+servers_models.sort()
 print(f'  💽 Получено {len(servers_models)} объектов класса Animated Model!')
 
 sounds_path = f'{os.path.abspath(os.path.join(map_folder, sounds))}'
